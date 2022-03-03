@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
-	"strings"
+	"time"
 )
 
 type Field struct {
@@ -47,6 +47,16 @@ func main() {
 			Field_size:    "30",
 			Field_default: "huy",
 		},
+		"is_admin": {
+			Field_type:    "bool",
+			Field_size:    "30",
+			Field_default: "huy",
+		},
+		"is_moderator": {
+			Field_type:    "bool",
+			Field_size:    "30",
+			Field_default: "true",
+		},
 	}
 
 	user := NewObject("users", user_fields)
@@ -68,48 +78,93 @@ func validate_fields(fields map[string]Field) map[string]Field {
 			Field_size:    "(" + field.Field_size + ")",
 			Field_default: field.Field_default,
 		}
-		if strings.Contains(field.Field_type, "integer") {
-			field = Field{
-				Field_type:    field.Field_type,
-				Field_default: field.Field_default,
-			}
-		}
-		if field.Field_default == "" {
-			field = Field{
-				Field_type: field.Field_type,
-				Field_size: field.Field_size,
-			}
-		} else {
-			if strings.Contains(field.Field_type, "integer") {
-				_, err := strconv.Atoi(field.Field_default)
-				if err != nil {
-					field = Field{
-						Field_type: field.Field_type,
-					}
-				}
-			}
-
+		field_type := field.Field_type
+		field = validate_basic(field)
+		switch {
+		case field_type == "varchar":
+			field = validate_varchar(field)
+		case field_type == "bool":
+			field = validate_bool(field)
+		case field_type == "integer":
+			field = validate_integer(field)
+		case field_type == "date":
+			field = validate_date(field)
+			// default:
+			// 	field = validate_basic(field)
+			// }
 		}
 		fields_validated[key] = field
 	}
 	return fields_validated
 }
 
-// return
+func validate_basic(field Field) Field {
+
+	if field.Field_default == "" {
+		field = Field{
+			Field_type: field.Field_type,
+			Field_size: field.Field_size,
+		}
+	}
+	if field.Field_type == "integer" || field.Field_type == "bool" || field.Field_type == "date" {
+		field = Field{
+			Field_type:    field.Field_type,
+			Field_default: field.Field_default,
+		}
+	}
+
+	return field
+}
+
+func validate_integer(field Field) Field {
+	if field.Field_default != "" {
+		_, err := strconv.Atoi(field.Field_default)
+		if err != nil {
+			fmt.Println(err)
+			field = Field{
+				Field_type: field.Field_type,
+			}
+		}
+	}
+	return field
+}
+
+func validate_varchar(field Field) Field {
+	return field
+}
+
+func validate_bool(field Field) Field {
+	if field.Field_default != "" {
+		_, err := strconv.ParseBool(field.Field_default)
+		if err != nil {
+			fmt.Println(err)
+			field = Field{
+				Field_type: field.Field_type,
+			}
+		}
+	}
+	return field
+}
+
+func validate_date(field Field) Field {
+	if field.Field_default != "" {
+		proper_date := "2006-01-02"
+		_, err := time.Parse("01/02/2006", proper_date)
+		if err != nil {
+			panic(err)
+		}
+	}
+	return field
+}
 
 func format_fields(object *Object) string {
 	var res string
 	var defaults string
 	fields := validate_fields(object.Fields)
-	fmt.Println(fields)
 	for key, field := range fields {
-		if field.Field_default != "" {
-			defaults = "DEAFAULT " + defaults
-		} else {
-			defaults = ""
-		}
 		res += key + " " + field.Field_type + " " + field.Field_size + " " + defaults + ", "
 	}
+	fmt.Println(res)
 	return res[:len(res)-2]
 }
 
